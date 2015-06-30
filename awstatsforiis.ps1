@@ -21,8 +21,8 @@ function Task-Setup {
     New-Item ('IIS:\Sites\' + $ini["SITEFORAWSTATS"] + '\Awstats') `
          -physicalPath (Join-Path $ini["AWSTATSPATH"] "wwwroot") -type Application
 
-    Add-WebConfigurationProperty -pspath ("MACHINE/WEBROOT/APPHOST/" + $ini["SITEFORAWSTATS"] + "/awstats/") `
-        -Filter system.webServer/handlers -Name . 
+    $pspath = ("MACHINE/WEBROOT/APPHOST/" + $ini["SITEFORAWSTATS"] + "/awstats/")
+    Add-WebConfigurationProperty -pspath $pspath -Filter system.webServer/handlers -Name . `
         -Value @{
             name="Perl CGI for .pl";
             path="*.pl";
@@ -30,6 +30,8 @@ function Task-Setup {
             modules="CgiModule";
             scriptProcessor="$perlexewithpar";
             resourceType="File";}
+    Add-WebConfigurationProperty -pspath $pspath -Filter system.webServer/defaultDocument/files -Name . `
+        -Value @{value="awstats.pl";}
 }
 
 #
