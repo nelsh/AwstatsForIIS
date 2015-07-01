@@ -72,6 +72,31 @@ function Task-Setup {
 
 function Task-AddCheck {
     "Add or Check awstats.*.conf file for every site"
+    if ($ini.ContainsKey("ExcludeSites")) { 
+        $ExcludeSites = $ini["ExcludeSites"].split(",")
+    }
+    if ($ini.ContainsKey("ExcludeBinding")) { 
+        $ExcludeBinding = $ini["ExcludeBinding"].split(",")
+    }
+    $skippedSites = ""
+    $skippedBinding = ""
+    foreach ($site in Get-ChildItem -Path IIS:\Sites) {
+        if ($ExcludeSites -contains $site.ID) {
+            $skippedSites += ("`t#" + $site.ID + " " + $site.Name + "`n")
+        } else {
+            ("#" + $site.ID + " " + $site.Name)
+            foreach ($binding in $site.Bindings.collection) {
+                $dnsname = $binding.bindingInformation.split(":")[2]
+                if ($ExcludeBinding -contains $dnsname) {
+                    $skippedBinding += ("`t#" + $site.ID + " " + $site.Name + " " + $dnsname + "`n")
+                } else {
+                    ("`t" + $dnsname)
+                }
+            }
+        }
+    }
+    "`nskippedSites:`n$skippedSites" 
+    "`nskippedBinding:`n$skippedBinding"
 }
 
 
@@ -91,7 +116,7 @@ $ini = ConvertFrom-StringData((Get-Content $inifile) -join "`n")
 
 # Run Task
 switch ($task) {
-    "setup" { Task-Setup }
+    "setup"    { Task-Setup }
     "addcheck" { Task-AddCheck }
-    default { ExitWithMsg("Task {0} not found" -f $task ) }
+    default    { ExitWithMsg("Task {0} not found" -f $task ) }
 }
