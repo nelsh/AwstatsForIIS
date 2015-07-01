@@ -70,6 +70,11 @@ function Task-Setup {
     Task-Setup-Awstats
 }
 
+function Task-AddCheck {
+    "Add or Check awstats.*.conf file for every site"
+}
+
+
 #
 # MAIN PROCEDURE
 #
@@ -87,5 +92,6 @@ $ini = ConvertFrom-StringData((Get-Content $inifile) -join "`n")
 # Run Task
 switch ($task) {
     "setup" { Task-Setup }
+    "addcheck" { Task-AddCheck }
     default { ExitWithMsg("Task {0} not found" -f $task ) }
 }
