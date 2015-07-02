@@ -106,7 +106,7 @@ function Task-AddCheck {
                 } else {
                     $totalNames++
                     $currentConf = Join-Path $ini["AWSTATSCONF"] ("awstats." +$dnsname + ".conf")
-                    $correctContent = ($ini["AWSTATSCONFIGTEMPLATE"] -f $iislogpath, $site.ID, $dnsname) -replace "!", "`n"
+                    $correctContent = ($ini["AWSTATSTMPL"] -f $iislogpath, $site.ID, $dnsname) -replace "!", "`n"
                     if (Test-Path $currentConf) {
                         "`tCheck $currentConf"
                         $totalChecked++
