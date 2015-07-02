@@ -1,14 +1,11 @@
 ﻿param($task)
 
-function ExitWithMsg($msg) {
-    Write-Host "Error: $msg`n" -foregroundcolor "red"
-    $scriptname=$MyInvocation.ScriptName
-    "Usage:`n"
-    "`t$scriptname -task <taskname>`n"
-    "`twhere 'taskname' is one from: setup, checkcfg, build, summary`n" 
-    exit(1)
-}
 
+#
+# SETUP TASKS
+#
+
+# run once from function Task-Setup
 function Task-Setup-IIS {
     "Run IIS Setup task"
     $perlexewithpar = $ini["PERLEXE"] + " `"%s`" %s"
@@ -43,6 +40,7 @@ function Task-Setup-IIS {
         -Value $ini["logExtFileFlags"]
 }
 
+# run once from function Task-Setup
 function Task-Setup-Awstats {
     "Run Awstats Setup task"
     $commonconf="C:\awstats\config\common.conf"
@@ -65,11 +63,17 @@ function Task-Setup-Awstats {
 
 }
 
+# run once from function Task-Setup
 function Task-Setup {
     Task-Setup-IIS
     Task-Setup-Awstats
 }
 
+#
+# REGULAR TASKS
+#
+
+# run regular from scheduler (weekly or monthly)
 function Task-AddCheck {
     "Add or Check awstats.*.conf file for every site"
     if ($ini.ContainsKey("ExcludeSites")) { 
@@ -78,8 +82,13 @@ function Task-AddCheck {
     if ($ini.ContainsKey("ExcludeBinding")) { 
         $ExcludeBinding = $ini["ExcludeBinding"].split(",")
     }
+    $iislogpath = (Get-WebConfiguration system.applicationHost/sites/siteDefaults/logFile/@directory).Value
     $skippedSites = ""
     $skippedBinding = ""
+    $incorrectContent = ""
+    $totalNames = 0
+    $totalChecked = 0
+    $totalWrited = 0
     foreach ($site in Get-ChildItem -Path IIS:\Sites) {
         if ($ExcludeSites -contains $site.ID) {
             $skippedSites += ("`t#" + $site.ID + " " + $site.Name + "`n")
@@ -90,11 +99,23 @@ function Task-AddCheck {
                 if ($ExcludeBinding -contains $dnsname) {
                     $skippedBinding += ("`t#" + $site.ID + " " + $site.Name + " " + $dnsname + "`n")
                 } else {
-                    ("`t" + $dnsname)
+                    $currentConf = Join-Path $ini["AWSTATSCONF"] ($ini["AWSTATSCONFIGFILENAME"] -f $dnsname)
+                    $correctContent = ($ini["AWSTATSCONFIGTEMPLATE"] -f $iislogpath, $site.ID, $dnsname) -replace "!", "`n"
+                    if (Test-Path $currentConf) {
+                        "`tCheck $currentConf"
+                        if (((Get-Content $currentConf) -join "`n") -ne $correctContent) {
+                            $incorrectContent  += ("`t#" + $site.ID + " " + $site.Name + "`n")
+                        }
+                    } else {
+                        "`tWrite $currentConf"
+                        Set-Content $currentConf $correctContent 
+                    }
+
                 }
             }
         }
     }
+    "`nincorrectContent:`n$incorrectContent"
     "`nskippedSites:`n$skippedSites" 
     "`nskippedBinding:`n$skippedBinding"
 }
@@ -103,9 +124,7 @@ function Task-AddCheck {
 #
 # MAIN PROCEDURE
 #
-if (!$task) {
-    ExitWithMsg("Not set task")
-}
+
 # Read parameters from ini-file
 $inifile = Join-Path $PSScriptRoot ( $MyInvocation.MyCommand.Name.Replace("ps1", "ini") )
 if (!(Test-Path $inifile)) {
@@ -118,5 +137,12 @@ $ini = ConvertFrom-StringData((Get-Content $inifile) -join "`n")
 switch ($task) {
     "setup"    { Task-Setup }
     "addcheck" { Task-AddCheck }
-    default    { ExitWithMsg("Task {0} not found" -f $task ) }
+    default    { 
+        Write-Host "Error: Task not set or not found`n" -foregroundcolor "red"
+        $scriptname=$MyInvocation.ScriptName
+        "Usage:`n"
+        "`t$scriptname -task <taskname>`n"
+        "`twhere 'taskname' is one from: setup, checkcfg, build, summary`n" 
+        exit(1)
+    }
 }
