@@ -84,30 +84,39 @@ function Task-AddCheck {
     }
     $iislogpath = (Get-WebConfiguration system.applicationHost/sites/siteDefaults/logFile/@directory).Value
     $skippedSites = ""
+    $skippedSitesCount = 0
     $skippedBinding = ""
+    $skippedBindingCount = 0
     $incorrectContent = ""
+    $incorrectContentCount = 0
     $totalNames = 0
     $totalChecked = 0
     $totalWrited = 0
     foreach ($site in Get-ChildItem -Path IIS:\Sites) {
         if ($ExcludeSites -contains $site.ID) {
+            $skippedSitesCount++
             $skippedSites += ("`t#" + $site.ID + " " + $site.Name + "`n")
         } else {
             ("#" + $site.ID + " " + $site.Name)
             foreach ($binding in $site.Bindings.collection) {
                 $dnsname = $binding.bindingInformation.split(":")[2]
                 if ($ExcludeBinding -contains $dnsname) {
+                    $skippedBindingCount++
                     $skippedBinding += ("`t#" + $site.ID + " " + $site.Name + " " + $dnsname + "`n")
                 } else {
+                    $totalNames++
                     $currentConf = Join-Path $ini["AWSTATSCONF"] ($ini["AWSTATSCONFIGFILENAME"] -f $dnsname)
                     $correctContent = ($ini["AWSTATSCONFIGTEMPLATE"] -f $iislogpath, $site.ID, $dnsname) -replace "!", "`n"
                     if (Test-Path $currentConf) {
                         "`tCheck $currentConf"
+                        $totalChecked++
                         if (((Get-Content $currentConf) -join "`n") -ne $correctContent) {
+                            $incorrectContentCount++
                             $incorrectContent  += ("`t#" + $site.ID + " " + $site.Name + "`n")
                         }
                     } else {
                         "`tWrite $currentConf"
+                        $totalWrited
                         Set-Content $currentConf $correctContent 
                     }
 
@@ -120,8 +129,10 @@ function Task-AddCheck {
 
     if ($ini.ContainsKey("MAILADDRESS") -and $ini.ContainsKey("MAILSERVER"))  {
         $msg = New-Object Net.Mail.MailMessage($ini["MAILADDRESS"], $ini["MAILADDRESS"])
-        $msg.Subject = ('Awstats {0}. Total/Checked/Writed: {1}/{2}/{3}' `
-            -f (Get-Item env:\Computername).Value, $totalNames, $totalChecked, $totalWrited)
+        $msg.Subject = ('Awstats {0}. Total/Checked/Writed: {1}/{2}/{3}. Incorrect/SkipSites/SkipNames: {4}/{5}/{6}' `
+            -f (Get-Item env:\Computername).Value, 
+                $totalNames, $totalChecked, $totalWrited,
+                $incorrectContentCount,$skippedSitesCount, $skippedBindingCount)
         $msg.Body = $infomsg
         $smtp = New-Object Net.Mail.SmtpClient($ini["MAILSERVER"])
         $smtp.Send($msg)
