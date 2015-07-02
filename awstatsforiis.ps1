@@ -45,7 +45,7 @@ function Task-Setup-Awstats {
     "Run Awstats Setup task"
     $commonconf="C:\awstats\config\common.conf"
     # create common config
-    Copy-Item C:\awstats\wwwroot\cgi-bin\awstats.model.conf $commonconf -Force
+    Copy-Item (Join-Path $ini["AWSTATSPATH"] "wwwroot\cgi-bin\awstats.model.conf") $commonconf -Force
     
     # set common parameters
     $commonconftxt = (Get-Content $commonconf)  -join "`n"
@@ -105,7 +105,7 @@ function Task-AddCheck {
                     $skippedBinding += ("`t#" + $site.ID + " " + $site.Name + " " + $dnsname + "`n")
                 } else {
                     $totalNames++
-                    $currentConf = Join-Path $ini["AWSTATSCONF"] ($ini["AWSTATSCONFIGFILENAME"] -f $dnsname)
+                    $currentConf = Join-Path $ini["AWSTATSCONF"] ("awstats." +$dnsname + ".conf")
                     $correctContent = ($ini["AWSTATSCONFIGTEMPLATE"] -f $iislogpath, $site.ID, $dnsname) -replace "!", "`n"
                     if (Test-Path $currentConf) {
                         "`tCheck $currentConf"
@@ -139,6 +139,15 @@ function Task-AddCheck {
     }
 }
 
+function Task-Build {
+    "Build/Update Site Statistic Database"
+    foreach ($config in (Get-ChildItem (Join-Path $ini["AWSTATSCONF"] "awstats.*.conf"))) { 
+        $currentConfig = $config.Name.Replace("awstats.", "").Replace(".conf","")
+        "$currentConfig - analyze last log file"
+        $awstatspl = Join-Path $ini["AWSTATSPATH"] "wwwroot\cgi-bin/awstats.pl"
+        & $ini["PERLEXE"] $awstatspl ("-configdir=" + $ini["AWSTATSCONF"]) ("-config=" + $currentConfig)
+    }
+}
 
 #
 # MAIN PROCEDURE
@@ -156,6 +165,7 @@ $ini = ConvertFrom-StringData((Get-Content $inifile) -join "`n")
 switch ($task) {
     "setup"    { Task-Setup }
     "addcheck" { Task-AddCheck }
+    "build"    { Task-Build }
     default    { 
         Write-Host "Error: Task not set or not found`n" -foregroundcolor "red"
         $scriptname=$MyInvocation.ScriptName
