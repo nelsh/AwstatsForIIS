@@ -118,6 +118,17 @@ function Task-AddCheck {
     "`nincorrectContent:`n$incorrectContent"
     "`nskippedSites:`n$skippedSites" 
     "`nskippedBinding:`n$skippedBinding"
+
+    if ($ini.ContainsKey("MAILADDRESS") -and $ini.ContainsKey("MAILSERVER"))  {
+        $msg = New-Object Net.Mail.MailMessage($ini["MAILADDRESS"], $ini["MAILADDRESS"])
+        $msg.Subject = ('Awstats {0}. Total/Checked/Writed: {1}/{2}/{3}' `
+            -f (Get-Item env:\Computername).Value, $totalNames, $totalChecked, $totalWrited)
+        $msg.Body = "`nincorrectContent:`n$incorrectContent"
+             + "`nskippedSites:`n$skippedSites"
+             + "`nskippedBinding:`n$skippedBinding"
+        $smtp = New-Object Net.Mail.SmtpClient($ini["MAILSERVER"])
+        $smtp.Send($msg)
+    }
 }
 
 
