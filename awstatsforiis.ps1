@@ -125,7 +125,7 @@ function Task-AddCheck {
                         }
                     } else {
                         "`tWrite $currentConf"
-                        $totalWrited
+                        $totalWrited++
                         Set-Content $currentConf $correctContent 
                     }
 
