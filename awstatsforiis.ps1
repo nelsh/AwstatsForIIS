@@ -43,7 +43,7 @@ function Task-Setup-IIS {
 # run once from function Task-Setup
 function Task-Setup-Awstats {
     "Run Awstats Setup task"
-    $commonconf="C:\awstats\config\common.conf"
+    $commonconf = Join-Path $ini["AWSTATSCONF"] "common.conf"
     # create common config
     Copy-Item (Join-Path $ini["AWSTATSPATH"] "wwwroot\cgi-bin\awstats.model.conf") $commonconf -Force
     
@@ -60,6 +60,15 @@ function Task-Setup-Awstats {
     foreach ($p in $plugins) {
         Add-Content $commonconf ("LoadPlugin=`"$p`"")
     }
+
+    # patch awstats.pl
+    $awstatspl = Join-Path $ini["AWSTATSPATH"] "wwwroot\cgi-bin\awstats.pl"
+    Copy-Item $awstatspl ($awstatspl + ".bak")
+    $tmp = (Get-Content $awstatspl) -join "`n"
+    $tmp | ForEach-Object { $_  -replace `
+        "my @PossibleConfigDir = \(", `
+        ("my @PossibleConfigDir = ( `"" + $ini["AWSTATSCONF"].Replace("\", "/") + "`"") } `
+        | Set-Content $awstatspl 
 
 }
 
@@ -144,7 +153,7 @@ function Task-Build {
     foreach ($config in (Get-ChildItem (Join-Path $ini["AWSTATSCONF"] "awstats.*.conf"))) { 
         $currentConfig = $config.Name.Replace("awstats.", "").Replace(".conf","")
         "$currentConfig - analyze last log file"
-        $awstatspl = Join-Path $ini["AWSTATSPATH"] "wwwroot\cgi-bin/awstats.pl"
+        $awstatspl = Join-Path $ini["AWSTATSPATH"] "wwwroot\cgi-bin\awstats.pl"
         & $ini["PERLEXE"] $awstatspl ("-configdir=" + $ini["AWSTATSCONF"]) ("-config=" + $currentConfig)
     }
 }
