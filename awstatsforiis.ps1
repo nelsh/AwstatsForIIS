@@ -1,6 +1,5 @@
 ﻿param($task)
 
-
 #
 # SETUP TASKS
 #
@@ -148,7 +147,7 @@ function Task-AddCheck {
     }
 }
 
-function Task-Build {
+function Task-Build-Data {
     "Build/Update Site Statistic Database"
     foreach ($config in (Get-ChildItem (Join-Path $ini["AWSTATSCONF"] "awstats.*.conf"))) { 
         $currentConfig = $config.Name.Replace("awstats.", "").Replace(".conf","")
@@ -158,6 +157,86 @@ function Task-Build {
     }
 }
 
+function Task-Build-Index {
+    $dataList = @{}
+    $dataDates = @{}
+    foreach ($config in (Get-ChildItem (Join-Path $ini["AWSTATSCONF"] "awstats.*.conf"))) { 
+        $currentConfig = $config.Name.Replace("awstats.", "").Replace(".conf","")
+        $currentConfig
+        $currentDates = @{}
+        foreach ($data in (Get-ChildItem (Join-Path $ini["DirData"].Replace("`"", '') "awstats*.$currentConfig.txt"))) { 
+            $d = $data.Name.Replace("awstats", "").Replace(".$currentConfig.txt", "")
+            $d = $d.Substring(2) + $d.Substring(0,2)
+            $totalUnique = Get-Content $data.FullName -TotalCount 70 | Select-String '>TotalUnique<' -SimpleMatch -List
+            $totalUnique = $totalUnique.ToString().Replace("<tr><td>TotalUnique</td><td>", "").Replace("</td></tr>", "").Trim()
+            $currentDates.Add($d, $totalUnique)
+            if (!$dataDates.ContainsKey($d)) {
+                $dataDates.Add($d, "")
+            }
+            "`t$d`t$totalUnique"
+        }
+        $dataList.Add($currentConfig, $currentDates)
+    }
+
+    $indexfile = Join-Path $ini["AWSTATSPATH"] "wwwroot\index.html"
+    $currentDate = (Get-Date).ToString('dd.MM.yyyy')
+    Set-Content $indexfile ("<html>
+    <head>
+    <title>AWStats Sites Links - " + $currentDate + "</title>
+    <style>
+    body {font-family:Verdana;font-size:0.7em;}
+    table {font-family:Verdana;font-size:1em;}
+    th {text-align:left;border: solid 1px #666;}
+    td {text-align:right;border: solid 1px #ccc;}
+    td.col01 {border-right: solid 1px #666;}
+    td.col12 {border-left: solid 1px #666;}
+    td.col07 {border-right: solid 1px #999;}
+    td.col06 {border-left: solid 1px #999;}
+    thead th {text-align:center;}
+    a {display:block;padding:3px;text-decoration:none;}
+    a:hover {background:#ff6;color:#f0f;}
+    </style>
+    </head>
+    <body>
+    <p>Last Updated: " + $currentDate + "</p>
+    <table border='1'>
+    <thead><tr><th>Site</th>");
+
+    foreach ($data in $dataDates.GetEnumerator() | sort name -Descending) {
+        Add-Content $indexfile (`
+            "<th align=center><small>" `
+             + $data.Name.Substring(0,4) `
+             + "</small><br><large>" `
+             + $data.Name.Substring(4) `
+             + "</large></th>");
+    }
+    Add-Content $indexfile "</tr></thead>"
+
+    foreach ($config in $dataList.GetEnumerator() | sort name) {
+        Add-Content $indexfile ("<tr><th>" + $config.Name + "</th>")
+        foreach ($data in $dataDates.GetEnumerator() | sort name -Descending) {
+            $y = $data.Name.Substring(0,4)
+            $m = $data.Name.Substring(4)
+            if ($dataList[$config.Name].ContainsKey($data.Name)) {
+                Add-Content $indexfile (`
+                    "<td class=col" + $m + ">"`
+				    + "<a href='/awstats/cgi-bin/?config=" + $config.Name` + "&month=" + $m` + "&year=" + $y + "'>"`
+                    + $dataList[$config.Name][$data.Name] + "</a>"`
+                    + "</td>");
+
+            } else {
+                Add-Content $indexfile ("<td class=col" + $data.Name.Substring(4) + ">&nbsp;</td>")
+            }
+        }
+        Add-Content $indexfile "</tr>"
+    }
+    Add-Content $indexfile "</table></body></html>"
+}
+
+function Task-Build {
+    Task-Build-Data
+    Task-Build-Index
+}
 #
 # MAIN PROCEDURE
 #
