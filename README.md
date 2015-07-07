@@ -128,7 +128,8 @@ schtasks.exe /create /tn AwstastCheck /tr "powershell -ExecutionPolicy Bypass -C
 
     .\awstatsforiis.ps1 -task build
 
-Для всех обнаруженных конфигурационных файлов сайтов запускается `awstats.pl` для сбора статистики.
+* Для всех обнаруженных конфигурационных файлов сайтов запускается `awstats.pl` для сбора статистики.
+* В корне виртуального приложения `c:\awstats\wwwroot` создается `index.html` - таблица со всеми доступными отчетами. 
 
 Задачу рекомендуется добавить в Task Scheduler
 
