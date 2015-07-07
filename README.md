@@ -43,7 +43,7 @@ AWStats установим в каталог `c:\awstats`. Там же разм�
 
 **Важно!** В конфигурационном файле приведен пример настроек для следующей конфигурации журналов IIS (может меняться только "Directory")
 
-    ![IIS-LogSettings.png](https://bitbucket.org/repo/6d7yBg/images/3430954973-IIS-LogSettings.png)
+![IIS-LogSettings.png](https://raw.githubusercontent.com/nelsh/AwstatsForIIS/screenshots/IIS-LogSettings.png)
 
 Создадим/отредактируем конфигурационный файл `c:\awstats\config\awstatsforiis.ini`
 
