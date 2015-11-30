@@ -1,4 +1,4 @@
-﻿param($task)
+﻿param($task, $srcPath, $trgPath)
 
 #
 # SETUP TASKS
@@ -77,6 +77,28 @@ function Task-Setup {
     Task-Setup-Awstats
 }
 
+# help function
+function Send-Mail ($subj, $body) {
+    $msg = New-Object Net.Mail.MailMessage($ini["MAILADDRESS"], $ini["MAILADDRESS"])
+    $msg.IsBodyHtml = $true
+    $msg.Subject = $subj
+    $msg.Body = $body
+    $smtp = New-Object Net.Mail.SmtpClient("")
+    if ($ini["MAILSERVER"].Contains(":")) {
+        $mailserver = $ini["MAILSERVER"].Split(":")
+        $smtp.Host = $mailserver[0]
+        $smtp.Port = $mailserver[1]
+    }
+    else {
+        $smtp.Host = $ini["MAILSERVER"]
+    }
+    #$smtp.EnableSsl = $true 
+    if ($ini.ContainsKey("MAILUSER") -and $ini.ContainsKey("MAILPASSWORD"))  {
+        $smtp.Credentials = New-Object System.Net.NetworkCredential($ini["MAILUSER"], $ini["MAILPASSWORD"]); 
+    }
+    $smtp.Send($msg)
+}
+
 #
 # REGULAR TASKS
 #
@@ -136,14 +158,36 @@ function Task-AddCheck {
     $infomsg
 
     if ($ini.ContainsKey("MAILADDRESS") -and $ini.ContainsKey("MAILSERVER"))  {
-        $msg = New-Object Net.Mail.MailMessage($ini["MAILADDRESS"], $ini["MAILADDRESS"])
-        $msg.Subject = ('Awstats {0}. Total/Checked/Writed: {1}/{2}/{3}. Incorrect/SkipSites/SkipNames: {4}/{5}/{6}' `
+        $subj = ('Awstats {0}. Total/Checked/Writed: {1}/{2}/{3}. Incorrect/SkipSites/SkipNames: {4}/{5}/{6}' `
             -f (Get-Item env:\Computername).Value, 
                 $totalNames, $totalChecked, $totalWrited,
                 $incorrectContentCount,$skippedSitesCount, $skippedBindingCount)
-        $msg.Body = $infomsg
-        $smtp = New-Object Net.Mail.SmtpClient($ini["MAILSERVER"])
-        $smtp.Send($msg)
+        Send-Mail $subj $infomsg
+    }
+}
+
+function Task-LogRotate {
+    # Use Info-Zip
+    $zipLogFile = "rotate.log"
+    $t = Get-Date (Get-Date).AddDays(-7) -uformat "%Y-%m-%d"
+    $tt = Get-Date -uformat "%Y-%m-%d"
+    $zipExe = "zip.exe -m -r -li -lf " + $zipLogFile + " -t " + $t  + " -tt " + $tt
+    echo $zipExe
+    # Zip Archive Name = trgPath + iislog + year + number of week
+    $zipFile = Join-Path $trgPath ("iislog" + (get-date -uformat "%y") + "w" + (get-date -uformat "%W"))
+
+    invoke-expression ($zipExe + " " + $zipFile + " " +  $srcPath)
+    if ($LastExitCode -eq 0) { 
+	    $subj = "IIS log rotate: SUCCESS. " 
+    }
+    else {
+	    $subj = "IIS log rotate: ERROR. "
+    }
+
+    $zipLog = Get-Content $zipLogFile
+    $subj += ($zipLog | Select-String 'total' -SimpleMatch) -join ". "
+    if ($ini.ContainsKey("MAILADDRESS") -and $ini.ContainsKey("MAILSERVER"))  {
+        Send-Mail $subj ($zipLog -join "`n")
     }
 }
 
@@ -251,15 +295,16 @@ $ini = ConvertFrom-StringData((Get-Content $inifile) -join "`n")
 
 # Run Task
 switch ($task) {
-    "setup"    { Task-Setup }
-    "addcheck" { Task-AddCheck }
-    "build"    { Task-Build }
+    "setup"        { Task-Setup }
+    "addcheck"     { Task-AddCheck }
+    "build"        { Task-Build }
+    "logrotate"    { Task-LogRotate }
     default    { 
         Write-Host "Error: Task not set or not found`n" -foregroundcolor "red"
         $scriptname=$MyInvocation.ScriptName
         "Usage:`n"
         "`t$scriptname -task <taskname>`n"
-        "`twhere 'taskname' is one from: setup, checkcfg, build, summary`n" 
+        "`twhere 'taskname' is one from: setup, checkcfg, build, logrotate`n" 
         exit(1)
     }
 }
