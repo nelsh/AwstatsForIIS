@@ -171,7 +171,7 @@ function Task-LogRotate {
     $zipLogFile = "rotate.log"
     $t = Get-Date (Get-Date).AddDays(-7) -uformat "%Y-%m-%d"
     $tt = Get-Date -uformat "%Y-%m-%d"
-    $zipExe = "zip.exe -m -r -li -lf " + $zipLogFile + " -t " + $t  + " -tt " + $tt
+    $zipExe = "./zip.exe -m -r -li -lf " + $zipLogFile + " -t " + $t  + " -tt " + $tt
     echo $zipExe
     # Zip Archive Name = trgPath + iislog + year + number of week
     $zipFile = Join-Path $trgPath ("iislog" + (get-date -uformat "%y") + "w" + (get-date -uformat "%W"))
