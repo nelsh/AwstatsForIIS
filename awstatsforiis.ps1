@@ -80,7 +80,6 @@ function Task-Setup {
 # help function
 function Send-Mail ($subj, $body) {
     $msg = New-Object Net.Mail.MailMessage($ini["MAILADDRESS"], $ini["MAILADDRESS"])
-    $msg.IsBodyHtml = $true
     $msg.Subject = $subj
     $msg.Body = $body
     $smtp = New-Object Net.Mail.SmtpClient("")
