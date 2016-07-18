@@ -1,4 +1,10 @@
-﻿param($task, $srcPath, $trgPath)
+﻿param(
+    [Parameter(Mandatory=$True)]
+    [ValidateSet("setup", "addcheck", "build", "logrotate", "logdelete")]
+    [string[]]$tasks,
+   
+    $srcPath, $trgPath
+)
 
 #
 # SETUP TASKS
@@ -121,34 +127,36 @@ function Task-AddCheck {
     $totalNames = 0
     $totalChecked = 0
     $totalWrited = 0
+    $idn = New-Object System.Globalization.IdnMapping
+
     foreach ($site in Get-ChildItem -Path IIS:\Sites) {
-        if ($ExcludeSites -contains $site.ID) {
+    if ($ExcludeSites.Contains($site.ID) -or $site.Name.StartsWith("_") -or $site.Name.ToLower().Contains("test")) {
             $skippedSitesCount++
             $skippedSites += ("`t#" + $site.ID + " " + $site.Name + "`n")
         } else {
             ("#" + $site.ID + " " + $site.Name)
             foreach ($binding in $site.Bindings.collection) {
-                $dnsname = $binding.bindingInformation.split(":")[2]
-                if ($ExcludeBinding -contains $dnsname) {
+            $dnsname = $idn.GetAscii($binding.bindingInformation.split(":")[2])
+            if ($ExcludeBinding.Contains($dnsname) -or $binding.bindingInformation.Contains("https") -or $dnsname.ToLower().Contains("test")) {
                     $skippedBindingCount++
                     $skippedBinding += ("`t#" + $site.ID + " " + $site.Name + " " + $dnsname + "`n")
                 } else {
                     $totalNames++
                     $currentConf = Join-Path $ini["AWSTATSCONF"] ("awstats." +$dnsname + ".conf")
-                    $correctContent = ($ini["AWSTATSTMPL"] -f $iislogpath, $site.ID, $dnsname) -replace "!", "`n"
+                    $correctContent = ($ini["AWSTATSTMPL"] -f (Get-Item env:\Computername).Value.ToLower(), $site.ID, $dnsname) -replace "!", "`n"
                     if (Test-Path $currentConf) {
                         "`tCheck $currentConf"
                         $totalChecked++
-                        if (((Get-Content $currentConf) -join "`n") -ne $correctContent) {
+                        if (((Get-Content $currentConf) -join "`n") -eq $correctContent) {
+                            continue
+                        } else {
                             $incorrectContentCount++
                             $incorrectContent  += ("`t#" + $site.ID + " " + $site.Name + "`n")
                         }
-                    } else {
-                        "`tWrite $currentConf"
-                        $totalWrited++
-                        Set-Content $currentConf $correctContent 
                     }
-
+                    "`tWrite $currentConf"
+                    $totalWrited++
+                    Set-Content $currentConf $correctContent 
                 }
             }
         }
@@ -188,6 +196,11 @@ function Task-LogRotate {
     if ($ini.ContainsKey("MAILADDRESS") -and $ini.ContainsKey("MAILSERVER"))  {
         Send-Mail $subj ($zipLog -join "`n")
     }
+}
+
+function Task-LogDelete {
+    $targetpath = (Get-WebConfiguration system.applicationHost/sites/siteDefaults/logFile/@directory).Value
+    get-childitem $targetpath -include *.log -recurse | where-object {$_.LastWriteTime -lt (Get-Date).AddDays(-10)} |  foreach ($_) { remove-item $_.fullname}
 }
 
 function Task-Build-Data {
@@ -292,18 +305,15 @@ if (!(Test-Path $inifile)) {
 }
 $ini = ConvertFrom-StringData((Get-Content $inifile) -join "`n")
 
-# Run Task
-switch ($task) {
-    "setup"        { Task-Setup }
-    "addcheck"     { Task-AddCheck }
-    "build"        { Task-Build }
-    "logrotate"    { Task-LogRotate }
-    default    { 
-        Write-Host "Error: Task not set or not found`n" -foregroundcolor "red"
-        $scriptname=$MyInvocation.ScriptName
-        "Usage:`n"
-        "`t$scriptname -task <taskname>`n"
-        "`twhere 'taskname' is one from: setup, checkcfg, build, logrotate`n" 
-        exit(1)
+# Run Tasks
+
+foreach ($task in $tasks) {
+    switch ($task) {
+        "setup"        { Task-Setup }
+        "addcheck"     { Task-AddCheck }
+        "build"        { Task-Build }
+        "logrotate"    { Task-LogRotate }
+        "logdelete"    { Task-LogDelete }
     }
 }
+
