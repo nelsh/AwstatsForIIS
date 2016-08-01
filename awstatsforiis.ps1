@@ -200,7 +200,7 @@ function Task-LogRotate {
 
 function Task-LogDelete {
     $targetpath = (Get-WebConfiguration system.applicationHost/sites/siteDefaults/logFile/@directory).Value
-    get-childitem $targetpath -include *.log -recurse | where-object {$_.LastWriteTime -lt (Get-Date).AddDays(-10)} |  foreach ($_) { remove-item $_.fullname}
+    foreach ( $f in get-childitem $targetpath -include *.log -recurse | where-object {$_.LastWriteTime -lt (Get-Date).AddDays(-8)} )  { remove-item $f.fullname }
 }
 
 function Task-Build-Data {
