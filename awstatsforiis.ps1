@@ -130,7 +130,7 @@ function Task-AddCheck {
     $idn = New-Object System.Globalization.IdnMapping
 
     foreach ($site in Get-ChildItem -Path IIS:\Sites) {
-    if ($ExcludeSites.Contains($site.ID) -or $site.Name.StartsWith("_") -or $site.Name.ToLower().Contains("test")) {
+    if ($ExcludeSites.Contains($site.ID.ToString()) -or $site.Name.StartsWith("_") -or $site.Name.ToLower().Contains("test")) {
             $skippedSitesCount++
             $skippedSites += ("`t#" + $site.ID + " " + $site.Name + "`n")
         } else {
